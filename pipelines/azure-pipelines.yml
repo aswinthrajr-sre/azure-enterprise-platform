@@ -21,17 +21,17 @@ stages:
     steps:
     - checkout: self
 
-    - task: Docker@2
+    - task: AzureCLI@2
       displayName: Build and Push Image to ACR
       inputs:
-        containerRegistry: azure-devops-connection
-        repository: $(imageRepository)
-        command: buildAndPush
-        Dockerfile: app/Dockerfile
-        buildContext: .
-        tags: |
-          $(imageTag)
-          latest
+        azureSubscription: azure-devops-connection
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          az acr build \
+            --registry acrdevplatform001 \
+            --image flaskapp:$(Build.BuildId) \
+            app
 
 - stage: Deploy
   displayName: Deploy to AKS
