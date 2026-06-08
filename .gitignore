@@ -5,5 +5,5 @@ terraform.tfvars
 .terraform.lock.hcl
 
 .vscode/
-
+.kube/
 *.log

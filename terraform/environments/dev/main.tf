@@ -35,8 +35,8 @@ module "network" {
 module "keyvault" {
   source = "../../modules/keyvault"
 
-  keyvault_name      = "kvdevplatform001"
-  location           = module.resource_group.resource_group_location
+  keyvault_name       = "kvdevplatform001"
+  location            = module.resource_group.resource_group_location
   resource_group_name = module.resource_group.resource_group_name
 
   tenant_id = var.tenant_id
@@ -70,7 +70,7 @@ module "aks" {
 
   subnet_id = module.network.aks_subnet_id
 
-  node_count = 2
+  node_count = 1
 
   tags = {
     Environment = "Dev"
