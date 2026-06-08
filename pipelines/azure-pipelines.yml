@@ -6,50 +6,64 @@ pool:
 
 variables:
   imageRepository: flaskapp
-  acrName: acrdevplatform001
+  acrLoginServer: acrdevplatform001.azurecr.io
   imageTag: $(Build.BuildId)
 
 stages:
 
 - stage: Build
+  displayName: Build and Push Image
 
   jobs:
-
   - job: BuildPush
+    displayName: Build and Push
 
     steps:
+    - checkout: self
 
-    - task: AzureCLI@2
+    - task: Docker@2
+      displayName: Build and Push Image to ACR
       inputs:
-        azureSubscription: azure-devops-connection
-        scriptType: bash
-        scriptLocation: inlineScript
-
-        inlineScript: |
-
-          az acr build \
-            --registry $(acrName) \
-            --image flaskapp:$(imageTag) \
-            app
+        containerRegistry: azure-devops-connection
+        repository: $(imageRepository)
+        command: buildAndPush
+        Dockerfile: app/Dockerfile
+        buildContext: .
+        tags: |
+          $(imageTag)
+          latest
 
 - stage: Deploy
-
+  displayName: Deploy to AKS
   dependsOn: Build
+  condition: succeeded()
 
   jobs:
-
   - job: DeployAKS
+    displayName: Deploy Application
 
     steps:
-
     - task: AzureCLI@2
+      displayName: Configure AKS Access
       inputs:
         azureSubscription: azure-devops-connection
         scriptType: bash
         scriptLocation: inlineScript
-
         inlineScript: |
+          az aks get-credentials \
+            --resource-group rg-dev-platform-eastus \
+            --name aks-dev-platform \
+            --overwrite-existing
 
+          kubectl get nodes
+
+    - task: AzureCLI@2
+      displayName: Deploy to Kubernetes
+      inputs:
+        azureSubscription: azure-devops-connection
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
           az aks get-credentials \
             --resource-group rg-dev-platform-eastus \
             --name aks-dev-platform \
@@ -60,5 +74,11 @@ stages:
           kubectl apply -f kubernetes/flask-service.yaml
 
           kubectl set image deployment/flaskapp \
-            flaskapp=acrdevplatform001.azurecr.io/flaskapp:$(imageTag) \
+            flaskapp=$(acrLoginServer)/$(imageRepository):$(imageTag) \
             -n demo
+
+          kubectl rollout status deployment/flaskapp -n demo
+
+          kubectl get pods -n demo
+
+          kubectl get svc -n demo
