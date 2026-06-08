@@ -1,0 +1,64 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  imageRepository: flaskapp
+  acrName: acrdevplatform001
+  imageTag: $(Build.BuildId)
+
+stages:
+
+- stage: Build
+
+  jobs:
+
+  - job: BuildPush
+
+    steps:
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: azure-devops-connection
+        scriptType: bash
+        scriptLocation: inlineScript
+
+        inlineScript: |
+
+          az acr build \
+            --registry $(acrName) \
+            --image flaskapp:$(imageTag) \
+            app
+
+- stage: Deploy
+
+  dependsOn: Build
+
+  jobs:
+
+  - job: DeployAKS
+
+    steps:
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: azure-devops-connection
+        scriptType: bash
+        scriptLocation: inlineScript
+
+        inlineScript: |
+
+          az aks get-credentials \
+            --resource-group rg-dev-platform-eastus \
+            --name aks-dev-platform \
+            --overwrite-existing
+
+          kubectl apply -f kubernetes/flask-deployment.yaml
+
+          kubectl apply -f kubernetes/flask-service.yaml
+
+          kubectl set image deployment/flaskapp \
+            flaskapp=acrdevplatform001.azurecr.io/flaskapp:$(imageTag) \
+            -n demo
