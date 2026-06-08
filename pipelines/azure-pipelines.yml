@@ -5,8 +5,9 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
-  imageRepository: flaskapp
+  acrName: acrdevplatform001
   acrLoginServer: acrdevplatform001.azurecr.io
+  imageRepository: flaskapp
   imageTag: $(Build.BuildId)
 
 stages:
@@ -19,6 +20,7 @@ stages:
     displayName: Build and Push
 
     steps:
+
     - checkout: self
 
     - task: AzureCLI@2
@@ -28,13 +30,19 @@ stages:
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
-          az acr build \
-            --registry acrdevplatform001 \
-            --image flaskapp:$(Build.BuildId) \
-            app
+          az acr login --name $(acrName)
+
+          docker build \
+            -t $(acrLoginServer)/$(imageRepository):$(imageTag) \
+            -f app/Dockerfile \
+            ./app
+
+          docker push \
+            $(acrLoginServer)/$(imageRepository):$(imageTag)
 
 - stage: Deploy
   displayName: Deploy to AKS
+
   dependsOn: Build
   condition: succeeded()
 
@@ -43,19 +51,6 @@ stages:
     displayName: Deploy Application
 
     steps:
-    - task: AzureCLI@2
-      displayName: Configure AKS Access
-      inputs:
-        azureSubscription: azure-devops-connection
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          az aks get-credentials \
-            --resource-group rg-dev-platform-eastus \
-            --name aks-dev-platform \
-            --overwrite-existing
-
-          kubectl get nodes
 
     - task: AzureCLI@2
       displayName: Deploy to Kubernetes
@@ -68,6 +63,8 @@ stages:
             --resource-group rg-dev-platform-eastus \
             --name aks-dev-platform \
             --overwrite-existing
+
+          kubectl get nodes
 
           kubectl apply -f kubernetes/flask-deployment.yaml
 
